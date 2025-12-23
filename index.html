@@ -106,17 +106,6 @@
       margin-bottom: 6px;
     }
 
-    .contact {
-      margin-top: 14px;
-    }
-
-    .contact a {
-      font-size: 0.85rem;
-      text-decoration: none;
-      color: var(--accent);
-      font-weight: 500;
-    }
-
     footer {
       text-align: center;
       padding: 32px 20px 40px;
@@ -167,7 +156,6 @@
 
   let rows = [];
 
-  // Proper CSV parser (handles commas inside fields)
   function parseCSV(text) {
     const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n");
     const headers = parseLine(lines.shift());
@@ -207,23 +195,11 @@
     return out;
   }
 
-  function looksLikeEmail(v) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-  }
-
   function render(data) {
     const container = document.getElementById("cards");
     container.innerHTML = "";
 
     data.forEach(m => {
-      const contact = m["Email or Linkedin URL"] || "";
-      let link = "";
-      if (contact) {
-        link = looksLikeEmail(contact)
-          ? `<a href="mailto:${contact}">Contact</a>`
-          : `<a href="${contact}" target="_blank" rel="noopener noreferrer">Contact</a>`;
-      }
-
       const card = document.createElement("div");
       card.className = "card";
       card.innerHTML = `
@@ -232,7 +208,6 @@
         <div class="meta"><strong>${m.Organization || ""}</strong></div>
         <div class="meta">${m["Position Title"] || ""}</div>
         <div class="meta">${m["Career Sector"] || ""} • ${m.Location || ""}</div>
-        <div class="contact">${link}</div>
       `;
       container.appendChild(card);
     });
