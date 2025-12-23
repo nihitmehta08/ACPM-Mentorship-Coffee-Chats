@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>ACPM Coffee Chats</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --card: #ffffff;
+      --accent: #6b4eff;
+      --text: #111827;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+    }
+
+    * {
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      padding: 48px 20px 32px;
+      text-align: center;
+      background: linear-gradient(135deg, #6b4eff, #8b7bff);
+      color: white;
+    }
+
+    header h1 {
+      margin: 0 0 10px;
+      font-size: 2.2rem;
+      font-weight: 700;
+    }
+
+    header p {
+      max-width: 680px;
+      margin: 0 auto;
+      font-size: 1.05rem;
+      opacity: 0.95;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .controls input,
+    .controls select {
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.95rem;
+      background: white;
+      min-width: 180px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    }
+
+    .name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .role {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .meta {
+      font-size: 0.9rem;
+      margin-bottom: 6px;
+    }
+
+    .contact {
+      margin-top: 14px;
+    }
+
+    .contact a {
+      font-size: 0.85rem;
+      text-decoration: none;
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    footer {
+      text-align: center;
+      padding: 32px 20px 40px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>☕ ACPM Coffee Chats</h1>
+  <p>
+    A curated list of Preventive Medicine mentors open to brief,
+    professional coffee conversations with ACPM residents.
+  </p>
+</header>
+
+<main>
+  <div class="controls">
+    <input id="search" type="text" placeholder="Search name, focus, organization…" />
+    <select id="roleFilter">
+      <option value="">All Roles</option>
+      <option>Faculty</option>
+      <option>Alumni</option>
+    </select>
+    <select id="sectorFilter">
+      <option value="">All Sectors</option>
+      <option>Government</option>
+      <option>Academia</option>
+      <option>Industry</option>
+    </select>
+  </div>
+
+  <div id="cards" class="grid"></div>
+</main>
+
+<footer>
+  This is a resident-initiated, opt-in mentorship discovery resource.
+</footer>
+
+<script>
+  const SHEET_CSV =
+    "https://docs.google.com/spreadsheets/d/1NC-armo71NIeIhq79FpeaWs-OurCl1rdo2Rebb53nAU/pub?output=csv";
+
+  let rows = [];
+
+  function parseCSV(text) {
+    const lines = text.trim().split("\n");
+    const headers = lines.shift().split(",").map(h => h.trim());
+    return lines.map(line => {
+      const values = line.split(",");
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = (values[i] || "").trim());
+      return obj;
+    });
+  }
+
+  function render(data) {
+    const container = document.getElementById("cards");
+    container.innerHTML = "";
+
+    data.forEach(m => {
+      const card = document.createElement("div");
+      card.className = "card";
+
+      card.innerHTML = `
+        <div class="name">${m["Full Name"] || ""}</div>
+        <div class="role">${m.Role || ""} • ${m["Primary Focus"] || ""}</div>
+        <div class="meta"><strong>${m.Organization || ""}</strong></div>
+        <div class="meta">${m["Position Title"] || ""}</div>
+        <div class="meta">${m["Career Sector"] || ""} • ${m.Location || ""}</div>
+        <div class="contact">
+          ${m["Email or Linkedin URL"]
+            ? `<a href="${m["Email or Linkedin URL"].includes("@")
+                ? "mailto:" + m["Email or Linkedin URL"]
+                : m["Email or Linkedin URL"]}"
+               target="_blank">Contact</a>`
+            : ""}
+        </div>
+      `;
+
+      container.appendChild(card);
+    });
+  }
+
+  function applyFilters() {
+    const q = document.getElementById("search").value.toLowerCase();
+    const role = document.getElementById("roleFilter").value;
+    const sector = document.getElementById("sectorFilter").value;
+
+    const filtered = rows.filter(m => {
+      const haystack = Object.values(m).join(" ").toLowerCase();
+      if (q && !haystack.includes(q)) return false;
+      if (role && m.Role !== role) return false;
+      if (sector && m["Career Sector"] !== sector) return false;
+      return true;
+    });
+
+    render(filtered);
+  }
+
+  fetch(SHEET_CSV)
+    .then(res => res.text())
+    .then(text => {
+      rows = parseCSV(text);
+      render(rows);
+    });
+
+  document.getElementById("search").addEventListener("input", applyFilters);
+  document.getElementById("roleFilter").addEventListener("change", applyFilters);
+  document.getElementById("sectorFilter").addEventListener("change", applyFilters);
+</script>
+
+</body>
+</html>
