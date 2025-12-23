@@ -123,6 +123,12 @@
       font-size: 0.85rem;
       color: var(--muted);
     }
+
+    .status {
+      text-align: center;
+      color: var(--muted);
+      margin-top: 12px;
+    }
   </style>
 </head>
 
@@ -141,18 +147,14 @@
     <input id="search" type="text" placeholder="Search name, focus, organization…" />
     <select id="roleFilter">
       <option value="">All Roles</option>
-      <option>Faculty</option>
-      <option>Alumni</option>
     </select>
     <select id="sectorFilter">
       <option value="">All Sectors</option>
-      <option>Government</option>
-      <option>Academia</option>
-      <option>Industry</option>
     </select>
   </div>
 
   <div id="cards" class="grid"></div>
+  <div id="status" class="status"></div>
 </main>
 
 <footer>
@@ -161,19 +163,52 @@
 
 <script>
   const SHEET_CSV =
-    "https://docs.google.com/spreadsheets/d/1NC-armo71NIeIhq79FpeaWs-OurCl1rdo2Rebb53nAU/pub?output=csv";
+    "https://docs.google.com/spreadsheets/d/e/2PACX-1vQvN5537PqV6MsohVriohtjdLuSvumJKuQ4AH2x5or10hcNtFtdtsfxTbtBFigJm0EicYxFPfuo86Wj/pub?output=csv";
 
   let rows = [];
 
+  // Proper CSV parser (handles commas inside fields)
   function parseCSV(text) {
-    const lines = text.trim().split("\n");
-    const headers = lines.shift().split(",").map(h => h.trim());
-    return lines.map(line => {
-      const values = line.split(",");
-      const obj = {};
-      headers.forEach((h, i) => obj[h] = (values[i] || "").trim());
-      return obj;
-    });
+    const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n");
+    const headers = parseLine(lines.shift());
+
+    return lines
+      .filter(l => l.trim().length > 0)
+      .map(line => {
+        const values = parseLine(line);
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = (values[i] || "").trim());
+        return obj;
+      });
+  }
+
+  function parseLine(line) {
+    const out = [];
+    let cur = "";
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === "," && !inQuotes) {
+        out.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out;
+  }
+
+  function looksLikeEmail(v) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
   }
 
   function render(data) {
@@ -181,26 +216,53 @@
     container.innerHTML = "";
 
     data.forEach(m => {
+      const contact = m["Email or Linkedin URL"] || "";
+      let link = "";
+      if (contact) {
+        link = looksLikeEmail(contact)
+          ? `<a href="mailto:${contact}">Contact</a>`
+          : `<a href="${contact}" target="_blank" rel="noopener noreferrer">Contact</a>`;
+      }
+
       const card = document.createElement("div");
       card.className = "card";
-
       card.innerHTML = `
         <div class="name">${m["Full Name"] || ""}</div>
         <div class="role">${m.Role || ""} • ${m["Primary Focus"] || ""}</div>
         <div class="meta"><strong>${m.Organization || ""}</strong></div>
         <div class="meta">${m["Position Title"] || ""}</div>
         <div class="meta">${m["Career Sector"] || ""} • ${m.Location || ""}</div>
-        <div class="contact">
-          ${m["Email or Linkedin URL"]
-            ? `<a href="${m["Email or Linkedin URL"].includes("@")
-                ? "mailto:" + m["Email or Linkedin URL"]
-                : m["Email or Linkedin URL"]}"
-               target="_blank">Contact</a>`
-            : ""}
-        </div>
+        <div class="contact">${link}</div>
       `;
-
       container.appendChild(card);
+    });
+
+    document.getElementById("status").textContent =
+      data.length ? `${data.length} mentor(s) shown` : "No mentors found.";
+  }
+
+  function populateFilters(data) {
+    const roles = new Set();
+    const sectors = new Set();
+
+    data.forEach(m => {
+      if (m.Role) roles.add(m.Role);
+      if (m["Career Sector"]) sectors.add(m["Career Sector"]);
+    });
+
+    const roleFilter = document.getElementById("roleFilter");
+    const sectorFilter = document.getElementById("sectorFilter");
+
+    [...roles].sort().forEach(v => {
+      const o = document.createElement("option");
+      o.value = v; o.textContent = v;
+      roleFilter.appendChild(o);
+    });
+
+    [...sectors].sort().forEach(v => {
+      const o = document.createElement("option");
+      o.value = v; o.textContent = v;
+      sectorFilter.appendChild(o);
     });
   }
 
@@ -221,10 +283,15 @@
   }
 
   fetch(SHEET_CSV)
-    .then(res => res.text())
+    .then(r => r.text())
     .then(text => {
       rows = parseCSV(text);
+      populateFilters(rows);
       render(rows);
+    })
+    .catch(() => {
+      document.getElementById("status").textContent =
+        "Unable to load data. Confirm the sheet is published as CSV.";
     });
 
   document.getElementById("search").addEventListener("input", applyFilters);
